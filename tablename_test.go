@@ -30,6 +30,22 @@ func TestTableName(t *testing.T) {
 		ut.Assert(t, err == nil, "")
 	}
 
+	tn, err := TableNameFromSegments("a", "b")
+	ut.Assert(t, err == nil, "")
+	ut.Equal(t, string(tn), "/a/b")
+
+	invalidSegments := [][]string{
+		[]string{"", "a"},
+		[]string{"c", "", "a"},
+		[]string{"1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1"},
+		[]string{"a", "b/c"},
+		[]string{"/a", "bc"},
+	}
+	for _, segs := range invalidSegments {
+		_, err := TableNameFromSegments(segs...)
+		ut.Assert(t, err != nil, "")
+	}
+
 	nameAndSegs := map[string][]string{
 		"/a/b/c": []string{"a", "b", "c"},
 		"/a/b":   []string{"a", "b"},
@@ -37,7 +53,7 @@ func TestTableName(t *testing.T) {
 	}
 
 	for k, v := range nameAndSegs {
-		tn, err := NewTableName(k)
+		tn, err = NewTableName(k)
 		ut.Assert(t, err == nil, "")
 		ut.Equal(t, v, tn.Segments())
 	}
@@ -52,6 +68,6 @@ func TestTableName(t *testing.T) {
 	ut.Equal(t, p, parent)
 	p, _ = parent.Parent()
 	ut.Equal(t, p, grandParent)
-	_, err := grandParent.Parent()
+	_, err = grandParent.Parent()
 	ut.Assert(t, err != nil, "")
 }

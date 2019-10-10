@@ -24,6 +24,14 @@ func TableNameFromSegments(segments ...string) (TableName, error) {
 	if len(segments) > MaxNestTableCount {
 		return "", fmt.Errorf("too many sub tables")
 	}
+	for _, seg := range segments {
+		if len(seg) == 0 {
+			return "", fmt.Errorf("name of sub table should not be empty")
+		}
+		if strings.IndexByte(seg, '/') != -1 {
+			return "", fmt.Errorf("name of sub table should not include slash")
+		}
+	}
 	return TableName(path.Join(append([]string{Root}, segments...)...)), nil
 }
 
