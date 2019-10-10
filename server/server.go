@@ -3,6 +3,7 @@ package server
 import (
 	"net"
 
+	"github.com/zdnscloud/kvzoo"
 	pb "github.com/zdnscloud/kvzoo/proto"
 	"google.golang.org/grpc"
 )
@@ -12,14 +13,10 @@ type KVGRPCServer struct {
 	listener net.Listener
 }
 
-func New(addr, dbPath string) (*KVGRPCServer, error) {
+func New(addr string, db kvzoo.DB) (*KVGRPCServer, error) {
 	server := grpc.NewServer()
 
-	service, err := newKVService(dbPath)
-	if err != nil {
-		return nil, err
-	}
-
+	service := newKVService(db)
 	pb.RegisterKVSServer(server, service)
 
 	listener, err := net.Listen("tcp", addr)
@@ -31,7 +28,6 @@ func New(addr, dbPath string) (*KVGRPCServer, error) {
 		server:   server,
 		listener: listener,
 	}, nil
-
 }
 
 func (s *KVGRPCServer) Start() error {

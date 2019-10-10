@@ -1,9 +1,9 @@
-package backend
+package bolt
 
 import (
 	"fmt"
 	"os"
-	"path"
+	stdpath "path"
 	"strings"
 	"time"
 
@@ -12,9 +12,7 @@ import (
 )
 
 const (
-	dbFileName  = "singlecloud.db"
 	openTimeout = 5 * time.Second
-	Root        = "/"
 )
 
 var (
@@ -23,49 +21,53 @@ var (
 	ErrDuplicateResource = fmt.Errorf("duplicate resource in db")
 )
 
-type Storage struct {
-	db *bolt.DB
+type BoltDB struct {
+	path string
+	db   *bolt.DB
 }
 
-func New(dbFile string) (kvzoo.DB, error) {
-	if dbFile == "" {
+func New(path string) (kvzoo.DB, error) {
+	if path == "" {
 		return nil, ErrInvalidDBPath
 	}
 
-	dir := path.Dir(dbFile)
+	dir := stdpath.Dir(path)
 	if dir != "" {
 		if err := os.MkdirAll(dir, os.ModePerm); err != nil {
 			return nil, err
 		}
 	}
 
-	db, err := bolt.Open(dbFile, 0664, &bolt.Options{
+	db, err := bolt.Open(path, 0664, &bolt.Options{
 		Timeout: openTimeout,
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	return &Storage{db: db}, nil
+	return &BoltDB{
+		db:   db,
+		path: path,
+	}, nil
 }
 
-func (m *Storage) Close() error {
-	return m.db.Close()
+func (db *BoltDB) Close() error {
+	return db.db.Close()
 }
 
-func (m *Storage) CreateOrGetTable(tableName string) (kvzoo.Table, error) {
-	if err := checkTableNameValid(tableName); err != nil {
-		return nil, err
-	}
+func (db *BoltDB) Destroy() error {
+	return os.Remove(db.path)
+}
 
-	tx, err := m.db.Begin(true)
+func (db *BoltDB) CreateOrGetTable(tableName kvzoo.TableName) (kvzoo.Table, error) {
+	tx, err := db.db.Begin(true)
 	if err != nil {
 		return nil, err
 	}
 
 	defer tx.Rollback()
 
-	if _, err := createOrGetBucket(tx, tableName); err != nil {
+	if _, err := createOrGetBucket(tx, string(tableName)); err != nil {
 		return nil, err
 	}
 
@@ -74,23 +76,19 @@ func (m *Storage) CreateOrGetTable(tableName string) (kvzoo.Table, error) {
 	}
 
 	return &DBTable{
-		name: tableName,
-		db:   m.db,
+		name: string(tableName),
+		db:   db.db,
 	}, nil
 }
 
-func (m *Storage) DeleteTable(tableName string) error {
-	if err := checkTableNameValid(tableName); err != nil {
-		return err
-	}
-
-	tx, err := m.db.Begin(true)
+func (db *BoltDB) DeleteTable(tableName kvzoo.TableName) error {
+	tx, err := db.db.Begin(true)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 
-	tables := strings.Split(strings.TrimPrefix(tableName, "/"), "/")
+	tables := tableName.Segments()
 	if len(tables) == 1 {
 		if err := tx.DeleteBucket([]byte(tables[0])); err != nil {
 			return err
@@ -112,18 +110,6 @@ func (m *Storage) DeleteTable(tableName string) error {
 	}
 
 	return tx.Commit()
-}
-
-func checkTableNameValid(tableName string) error {
-	if tableName == "" || tableName == "/" {
-		return fmt.Errorf("table name should not be empty")
-	}
-
-	if strings.HasPrefix(tableName, "/") == false {
-		return fmt.Errorf("table name should begin with /")
-	}
-
-	return nil
 }
 
 func createOrGetBucket(tx *bolt.Tx, tableName string) (*bolt.Bucket, error) {
@@ -153,13 +139,13 @@ type DBTable struct {
 	db   *bolt.DB
 }
 
-func (m *DBTable) Begin() (kvzoo.Transaction, error) {
-	tx, err := m.db.Begin(true)
+func (db *DBTable) Begin() (kvzoo.Transaction, error) {
+	tx, err := db.db.Begin(true)
 	if err != nil {
 		return nil, err
 	}
 
-	bucket, err := createOrGetBucket(tx, m.name)
+	bucket, err := createOrGetBucket(tx, db.name)
 	if err != nil {
 		tx.Commit()
 		return nil, err
@@ -167,7 +153,7 @@ func (m *DBTable) Begin() (kvzoo.Transaction, error) {
 
 	if bucket == nil {
 		tx.Commit()
-		return nil, fmt.Errorf("table %s is non-exists", m.name)
+		return nil, fmt.Errorf("table %s is non-exists", db.name)
 	}
 
 	return &TableTX{
@@ -179,35 +165,35 @@ type TableTX struct {
 	bucket *bolt.Bucket
 }
 
-func (m *TableTX) Rollback() error {
-	return m.bucket.Tx().Rollback()
+func (tx *TableTX) Rollback() error {
+	return tx.bucket.Tx().Rollback()
 }
 
-func (m *TableTX) Commit() error {
-	return m.bucket.Tx().Commit()
+func (tx *TableTX) Commit() error {
+	return tx.bucket.Tx().Commit()
 }
 
-func (m *TableTX) Add(key string, value []byte) error {
-	if v := m.bucket.Get([]byte(key)); v != nil {
+func (tx *TableTX) Add(key string, value []byte) error {
+	if v := tx.bucket.Get([]byte(key)); v != nil {
 		return ErrDuplicateResource
 	}
-	return m.bucket.Put([]byte(key), value)
+	return tx.bucket.Put([]byte(key), value)
 }
 
-func (m *TableTX) Delete(key string) error {
-	return m.bucket.Delete([]byte(key))
+func (tx *TableTX) Delete(key string) error {
+	return tx.bucket.Delete([]byte(key))
 }
 
-func (m *TableTX) Update(key string, value []byte) error {
-	if v := m.bucket.Get([]byte(key)); v == nil {
+func (tx *TableTX) Update(key string, value []byte) error {
+	if v := tx.bucket.Get([]byte(key)); v == nil {
 		return ErrNotFoundResource
 	}
 
-	return m.bucket.Put([]byte(key), value)
+	return tx.bucket.Put([]byte(key), value)
 }
 
-func (m *TableTX) Get(key string) ([]byte, error) {
-	if v := m.bucket.Get([]byte(key)); v != nil {
+func (tx *TableTX) Get(key string) ([]byte, error) {
+	if v := tx.bucket.Get([]byte(key)); v != nil {
 		tmp := make([]byte, len(v))
 		copy(tmp, v)
 		return tmp, nil
@@ -216,9 +202,9 @@ func (m *TableTX) Get(key string) ([]byte, error) {
 	}
 }
 
-func (m *TableTX) List() (map[string][]byte, error) {
+func (tx *TableTX) List() (map[string][]byte, error) {
 	resourceMap := make(map[string][]byte)
-	if err := m.bucket.ForEach(func(k, v []byte) error {
+	if err := tx.bucket.ForEach(func(k, v []byte) error {
 		tmp := make([]byte, len(v))
 		copy(tmp, v)
 		resourceMap[string(k)] = tmp
@@ -228,8 +214,4 @@ func (m *TableTX) List() (map[string][]byte, error) {
 	}
 
 	return resourceMap, nil
-}
-
-func GenTableName(tables ...string) string {
-	return path.Join(append([]string{Root}, tables...)...)
 }

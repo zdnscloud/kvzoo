@@ -9,7 +9,6 @@ import (
 	"github.com/golang/protobuf/ptypes/empty"
 
 	"github.com/zdnscloud/kvzoo"
-	"github.com/zdnscloud/kvzoo/backend"
 	pb "github.com/zdnscloud/kvzoo/proto"
 )
 
@@ -26,18 +25,13 @@ type KVService struct {
 	txLock    sync.RWMutex
 }
 
-func newKVService(dbPath string) (*KVService, error) {
-	db, err := backend.New(dbPath)
-	if err != nil {
-		return nil, err
-	}
-
+func newKVService(db kvzoo.DB) *KVService {
 	return &KVService{
 		db:           db,
 		nextTxId:     0,
 		openedTables: make(map[string]kvzoo.Table),
 		openedTxs:    make(map[int64]kvzoo.Transaction),
-	}, nil
+	}
 }
 
 func (s *KVService) CreateOrGetTable(ctx context.Context, in *pb.CreateOrGetTableRequest) (*empty.Empty, error) {
@@ -45,7 +39,12 @@ func (s *KVService) CreateOrGetTable(ctx context.Context, in *pb.CreateOrGetTabl
 	defer s.tableLock.Unlock()
 
 	if _, ok := s.openedTables[in.Name]; ok == false {
-		table, err := s.db.CreateOrGetTable(in.Name)
+		tn, err := kvzoo.NewTableName(in.Name)
+		if err != nil {
+			return nil, err
+		}
+
+		table, err := s.db.CreateOrGetTable(tn)
 		if err != nil {
 			return nil, err
 		}
@@ -60,7 +59,12 @@ func (s *KVService) DeleteTable(ctx context.Context, in *pb.DeleteTableRequest) 
 	delete(s.openedTables, in.Name)
 	s.tableLock.Unlock()
 
-	if err := s.db.DeleteTable(in.Name); err != nil {
+	tn, err := kvzoo.NewTableName(in.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.db.DeleteTable(tn); err != nil {
 		return nil, err
 	} else {
 		return &empty.Empty{}, nil
