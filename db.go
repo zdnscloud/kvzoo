@@ -1,12 +1,16 @@
 package kvzoo
 
 type DB interface {
+	//Close and Destroy are mutually exclusive
+	//release the conn
 	Close() error
+	//clean all the data and release the conn
+	Destroy() error
+
 	//like path, create child table, will create all parent table too
 	CreateOrGetTable(TableName) (Table, error)
 	//delete parent table will delete all child table
 	DeleteTable(TableName) error
-	Destroy() error
 }
 
 type Table interface {

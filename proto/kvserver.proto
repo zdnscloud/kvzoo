@@ -4,6 +4,9 @@ package pb;
 
 import "google/protobuf/empty.proto";
 
+message DestroyRequest {
+}
+
 message CreateOrGetTableRequest {
   string name = 1;
 }
@@ -64,6 +67,8 @@ message ListResponse {
 
 
 service KVS {
+    rpc Destroy(DestroyRequest) returns (google.protobuf.Empty) {}
+
     rpc CreateOrGetTable(CreateOrGetTableRequest) returns (google.protobuf.Empty) {}
     rpc DeleteTable(DeleteTableRequest) returns (google.protobuf.Empty) {}
     

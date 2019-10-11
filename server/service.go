@@ -12,7 +12,7 @@ import (
 	pb "github.com/zdnscloud/kvzoo/proto"
 )
 
-const MaxOpenTxCount = 1000
+const MaxOpenTxCount = 2000
 
 type KVService struct {
 	db       kvzoo.DB
@@ -31,6 +31,25 @@ func newKVService(db kvzoo.DB) *KVService {
 		nextTxId:     0,
 		openedTables: make(map[string]kvzoo.Table),
 		openedTxs:    make(map[int64]kvzoo.Transaction),
+	}
+}
+
+func (s *KVService) Destroy(ctx context.Context, in *pb.DestroyRequest) (*empty.Empty, error) {
+	s.tableLock.Lock()
+	defer s.tableLock.Unlock()
+	s.openedTables = make(map[string]kvzoo.Table)
+	s.txLock.Lock()
+	defer s.txLock.Unlock()
+	s.openedTxs = make(map[int64]kvzoo.Transaction)
+
+	if err := s.db.Close(); err != nil {
+		return nil, err
+	}
+
+	if err := s.db.Destroy(); err != nil {
+		return nil, err
+	} else {
+		return &empty.Empty{}, nil
 	}
 }
 
@@ -80,11 +99,12 @@ func (s *KVService) BeginTransaction(ctx context.Context, in *pb.BeginTransactio
 		return nil, fmt.Errorf("table %s doesn't exists", in.TableName)
 	}
 
-	s.txLock.Lock()
-	defer s.txLock.Unlock()
+	s.txLock.RLock()
 	if len(s.openedTxs) > MaxOpenTxCount {
+		s.txLock.RUnlock()
 		return nil, fmt.Errorf("too many transactions are opened")
 	}
+	s.txLock.RUnlock()
 
 	tx, err := table.Begin()
 	if err != nil {
@@ -92,7 +112,9 @@ func (s *KVService) BeginTransaction(ctx context.Context, in *pb.BeginTransactio
 	}
 
 	id := atomic.AddInt64(&s.nextTxId, 1)
+	s.txLock.Lock()
 	s.openedTxs[id] = tx
+	s.txLock.Unlock()
 	return &pb.BeginTransactionReply{
 		TxId: id,
 	}, nil

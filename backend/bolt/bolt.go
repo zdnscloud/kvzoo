@@ -56,6 +56,9 @@ func (db *BoltDB) Close() error {
 }
 
 func (db *BoltDB) Destroy() error {
+	if err := db.Close(); err != nil {
+		return err
+	}
 	return os.Remove(db.path)
 }
 
