@@ -1,6 +1,9 @@
 package kvzoo
 
 type DB interface {
+	//footprint of the data, used to quickly
+	//verfiy the data of two db is same
+	Checksum() (string, error)
 	//Close and Destroy are mutually exclusive
 	//release the conn
 	Close() error

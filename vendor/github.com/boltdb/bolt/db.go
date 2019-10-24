@@ -386,6 +386,14 @@ func (db *DB) init() error {
 	return nil
 }
 
+func (db *DB) Checksum() string {
+	m := db.meta()
+	if m == nil {
+		panic("db meta is nil")
+	}
+	return fmt.Sprintf("%d:%d:%v", m.magic, m.version, m.checksum)
+}
+
 // Close releases all database resources.
 // All transactions must be closed before closing the database.
 func (db *DB) Close() error {

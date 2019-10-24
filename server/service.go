@@ -34,6 +34,21 @@ func newKVService(db kvzoo.DB) *KVService {
 	}
 }
 
+func (s *KVService) Close() {
+	s.db.Close()
+}
+
+func (s *KVService) Checksum(ctx context.Context, in *pb.ChecksumRequest) (*pb.ChecksumReply, error) {
+	cs, err := s.db.Checksum()
+	if err != nil {
+		return nil, err
+	} else {
+		return &pb.ChecksumReply{
+			Checksum: cs,
+		}, nil
+	}
+}
+
 func (s *KVService) Destroy(ctx context.Context, in *pb.DestroyRequest) (*empty.Empty, error) {
 	s.tableLock.Lock()
 	defer s.tableLock.Unlock()

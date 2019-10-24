@@ -1,7 +1,6 @@
 package tests
 
 import (
-	//"fmt"
 	"sync"
 	"testing"
 
@@ -11,6 +10,46 @@ import (
 	"github.com/zdnscloud/kvzoo/client"
 	"github.com/zdnscloud/kvzoo/server"
 )
+
+func mustChecksum(db kvzoo.DB) string {
+	cs, err := db.Checksum()
+	if err != nil {
+		panic("db checksum get err:" + err.Error())
+	}
+	return cs
+}
+
+func TestBoltDBChecksum(t *testing.T) {
+	db1, err := bolt.New("test1.db")
+	ut.Assert(t, err == nil, "")
+	db2, err := bolt.New("test2.db")
+	ut.Assert(t, err == nil, "")
+	ut.Equal(t, mustChecksum(db1), mustChecksum(db2))
+
+	keyPrefix, valuePrefix := "key", "v"
+	keys, values := genData(keyPrefix, valuePrefix, 10)
+	tableName, _ := kvzoo.NewTableName("/xxxx/xx")
+	loadDataToTable(db1, tableName, keys, values)
+	db1.Close()
+	db2.Close()
+
+	db1, err = bolt.New("test1.db")
+	ut.Assert(t, err == nil, "")
+	db2, err = bolt.New("test2.db")
+	ut.Assert(t, err == nil, "")
+	ut.Assert(t, mustChecksum(db1) != mustChecksum(db2), "")
+	loadDataToTable(db2, tableName, keys, values)
+	db1.Close()
+	db2.Close()
+
+	db1, err = bolt.New("test1.db")
+	ut.Assert(t, err == nil, "")
+	db2, err = bolt.New("test2.db")
+	ut.Assert(t, err == nil, "")
+	ut.Equal(t, mustChecksum(db1), mustChecksum(db2))
+	db1.Destroy()
+	db2.Destroy()
+}
 
 func TestBoltDBTable(t *testing.T) {
 	withBoltDB(t, testTable)
@@ -44,6 +83,8 @@ func withRemoteDB(t *testing.T, test func(t *testing.T, db kvzoo.DB)) {
 
 	ldb, err := client.New(saddr1, []string{saddr2})
 	ut.Equal(t, err, nil)
+	_, err = ldb.Checksum()
+	ut.Assert(t, err == nil, "")
 	defer func() {
 		ldb.Destroy()
 		rdb1.Stop()

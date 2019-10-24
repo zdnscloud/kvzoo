@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/zdnscloud/cement/log"
@@ -34,10 +35,34 @@ func New(masterAddr string, slaveAddrs []string) (kvzoo.DB, error) {
 		slaves = append(slaves, slave)
 	}
 
-	return &Proxy{
+	p := &Proxy{
 		master: master,
 		slaves: slaves,
-	}, nil
+	}
+
+	if _, err := p.Checksum(); err != nil {
+		return nil, err
+	} else {
+		return p, nil
+	}
+}
+
+func (p *Proxy) Checksum() (string, error) {
+	req := &pb.ChecksumRequest{}
+	reply, err := p.master.Checksum(context.TODO(), req)
+	if err != nil {
+		return "", err
+	}
+
+	cs := reply.Checksum
+	for _, slave := range p.slaves {
+		if reply, err := slave.Checksum(context.TODO(), req); err != nil {
+			return "", fmt.Errorf("%s get checksum failed:%s", slave.Target(), err.Error())
+		} else if reply.Checksum != cs {
+			return "", fmt.Errorf("checksum of %s isn't same with master %s", slave.Target(), p.master.Target())
+		}
+	}
+	return cs, nil
 }
 
 func (p *Proxy) Close() error {

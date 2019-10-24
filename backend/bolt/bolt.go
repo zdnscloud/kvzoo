@@ -51,6 +51,10 @@ func New(path string) (kvzoo.DB, error) {
 	}, nil
 }
 
+func (db *BoltDB) Checksum() (string, error) {
+	return db.db.Checksum(), nil
+}
+
 func (db *BoltDB) Close() error {
 	return db.db.Close()
 }

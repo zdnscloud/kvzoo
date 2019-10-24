@@ -34,6 +34,7 @@
 每个kv服务默认使用boltdb作为存储引擎，存储接口
 ```go
 type DB interface {
+    Chechsum() (string, error)
     //Close and Destroy are mutually exclusive
     //release the conn
     Close() error
@@ -71,6 +72,10 @@ type Transaction interface {
 ### kv服务器
 kv服务器使用grpc协议，client屏蔽服务器的一切协议交互，同时client实现了db接口，使得应用访问
 远端数据库如同访问本地服务一样
+
+## 数据一致性保证
+client在启动的时候，会去获取所有节点数据的checksum值，并进行对比，如果checksum值不一致，client会报错。
+从而保证当系统发送变化，重新启动的时候，各节点的数据总是一致的。
 
 ## 未来工作
 - 当某个节点宕机，数据导入需要停止整个应用，然后采用拷贝文件的方式来同步数据

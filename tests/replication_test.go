@@ -29,10 +29,11 @@ func TestDBReplication(t *testing.T) {
 	ut.Equal(t, err, nil)
 	defer func() {
 		ldb.Destroy()
-		ldb.Close()
 		rdb1.Stop()
 		rdb2.Stop()
 	}()
+	_, err = ldb.Checksum()
+	ut.Assert(t, err == nil, "")
 
 	//replication after add
 	keyPrefix, valuePrefix := "key", "value"
@@ -55,6 +56,8 @@ func TestDBReplication(t *testing.T) {
 
 	ut.Assert(t, tableHasData(db1, tableName, keys, values), "")
 	ut.Assert(t, tableHasData(db2, tableName, keys, values), "")
+	_, err = ldb.Checksum()
+	ut.Assert(t, err == nil, "")
 
 	//replication after update
 	keyPrefix, valuePrefix = "k", "vvv"
@@ -65,6 +68,8 @@ func TestDBReplication(t *testing.T) {
 
 	ut.Assert(t, tableHasData(db1, tableName, keys, values), "")
 	ut.Assert(t, tableHasData(db2, tableName, keys, values), "")
+	_, err = ldb.Checksum()
+	ut.Assert(t, err == nil, "")
 
 	//replication after delete
 	err = deleteDataInTableInParal(ldb, tableName, keys, values)
@@ -76,4 +81,6 @@ func TestDBReplication(t *testing.T) {
 	data, err = getTableData(db2, tableName)
 	ut.Equal(t, err, nil)
 	ut.Equal(t, len(data), 0)
+	_, err = ldb.Checksum()
+	ut.Assert(t, err == nil, "")
 }

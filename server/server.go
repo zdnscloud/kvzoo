@@ -9,6 +9,7 @@ import (
 )
 
 type KVGRPCServer struct {
+	service  *KVService
 	server   *grpc.Server
 	listener net.Listener
 }
@@ -25,6 +26,7 @@ func New(addr string, db kvzoo.DB) (*KVGRPCServer, error) {
 	}
 
 	return &KVGRPCServer{
+		service:  service,
 		server:   server,
 		listener: listener,
 	}, nil
@@ -36,5 +38,6 @@ func (s *KVGRPCServer) Start() error {
 
 func (s *KVGRPCServer) Stop() error {
 	s.server.GracefulStop()
+	s.service.Close()
 	return nil
 }
