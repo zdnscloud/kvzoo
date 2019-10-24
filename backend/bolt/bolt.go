@@ -20,9 +20,9 @@ const (
 )
 
 var (
-	ErrInvalidDBPath     = fmt.Errorf("db file isn't exist")
-	ErrNotFoundResource  = fmt.Errorf("resource doesn't exist in db")
-	ErrDuplicateResource = fmt.Errorf("duplicate resource in db")
+	ErrInvalidDBPath     = fmt.Errorf("db file doesn't exist")
+	ErrNotFoundResource  = fmt.Errorf("resource doesn't exist")
+	ErrDuplicateResource = fmt.Errorf("duplicate resource")
 )
 
 type BoltDB struct {
