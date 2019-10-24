@@ -1,7 +1,10 @@
 package bolt
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
+	"hash"
 	"os"
 	stdpath "path"
 	"strings"
@@ -12,12 +15,13 @@ import (
 )
 
 const (
-	openTimeout = 5 * time.Second
+	openTimeout   = 5 * time.Second
+	checkKeyCount = 10
 )
 
 var (
 	ErrInvalidDBPath     = fmt.Errorf("db file isn't exist")
-	ErrNotFoundResource  = fmt.Errorf("no found resource in db")
+	ErrNotFoundResource  = fmt.Errorf("resource doesn't exist in db")
 	ErrDuplicateResource = fmt.Errorf("duplicate resource in db")
 )
 
@@ -52,7 +56,61 @@ func New(path string) (kvzoo.DB, error) {
 }
 
 func (db *BoltDB) Checksum() (string, error) {
-	return db.db.Checksum(), nil
+	tx, err := db.db.Begin(false)
+	if err != nil {
+		return "", err
+	}
+	defer tx.Rollback()
+
+	h := md5.New()
+	c := tx.Cursor()
+	k, v := c.First()
+	if k != nil {
+		h.Write(k)
+		if v != nil {
+			h.Write(v)
+		} else {
+			db.bucketCheckSum(h, tx.Bucket(k))
+		}
+		for {
+			k, v := c.Next()
+			if k == nil {
+				break
+			}
+			h.Write(k)
+			if v != nil {
+				h.Write(v)
+			} else {
+				db.bucketCheckSum(h, tx.Bucket(k))
+			}
+		}
+	}
+	return hex.EncodeToString(h.Sum(nil)[:16]), nil
+}
+
+func (db *BoltDB) bucketCheckSum(h hash.Hash, b *bolt.Bucket) {
+	c := b.Cursor()
+	k, v := c.First()
+	if k != nil {
+		h.Write(k)
+		if v != nil {
+			h.Write(v)
+		} else {
+			db.bucketCheckSum(h, b.Bucket(k))
+		}
+		for {
+			k, v := c.Next()
+			if k == nil {
+				break
+			}
+			h.Write(k)
+			if v != nil {
+				h.Write(v)
+			} else {
+				db.bucketCheckSum(h, b.Bucket(k))
+			}
+		}
+	}
 }
 
 func (db *BoltDB) Close() error {

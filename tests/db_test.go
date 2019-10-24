@@ -24,31 +24,18 @@ func TestBoltDBChecksum(t *testing.T) {
 	ut.Assert(t, err == nil, "")
 	db2, err := bolt.New("test2.db")
 	ut.Assert(t, err == nil, "")
+	defer func() {
+		db1.Destroy()
+		db2.Destroy()
+	}()
 	ut.Equal(t, mustChecksum(db1), mustChecksum(db2))
 
-	keyPrefix, valuePrefix := "key", "v"
-	keys, values := genData(keyPrefix, valuePrefix, 10)
 	tableName, _ := kvzoo.NewTableName("/xxxx/xx")
-	loadDataToTable(db1, tableName, keys, values)
-	db1.Close()
-	db2.Close()
-
-	db1, err = bolt.New("test1.db")
-	ut.Assert(t, err == nil, "")
-	db2, err = bolt.New("test2.db")
-	ut.Assert(t, err == nil, "")
-	ut.Assert(t, mustChecksum(db1) != mustChecksum(db2), "")
-	loadDataToTable(db2, tableName, keys, values)
-	db1.Close()
-	db2.Close()
-
-	db1, err = bolt.New("test1.db")
-	ut.Assert(t, err == nil, "")
-	db2, err = bolt.New("test2.db")
-	ut.Assert(t, err == nil, "")
+	keyPrefix, valuePrefix := "key", "v"
+	keys, values := genData(keyPrefix, valuePrefix, 1000)
+	loadDataToTableInParal(db1, tableName, keys, values)
+	loadDataToTableInParal(db2, tableName, keys, values)
 	ut.Equal(t, mustChecksum(db1), mustChecksum(db2))
-	db1.Destroy()
-	db2.Destroy()
 }
 
 func TestBoltDBTable(t *testing.T) {

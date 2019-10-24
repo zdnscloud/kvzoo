@@ -1,7 +1,11 @@
 package tests
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
+	"io"
+	"os"
 	"sync"
 	"testing"
 
@@ -170,4 +174,20 @@ func assertMapEqualsToSlices(t *testing.T, m map[string][]byte, keys, values []s
 	for i := 0; i < len(keys); i++ {
 		ut.Equal(t, string(m[keys[i]]), values[i])
 	}
+}
+
+func md5OfFile(filePath string) string {
+	f, err := os.Open(filePath)
+	if err != nil {
+		panic(fmt.Sprintf("open %s failed:%v", filePath, err.Error()))
+	}
+	defer f.Close()
+
+	hash := md5.New()
+	if _, err := io.Copy(hash, f); err != nil {
+		panic(fmt.Sprintf("copy %s failed:%v", filePath, err.Error()))
+	}
+
+	hashInBytes := hash.Sum(nil)[:16]
+	return hex.EncodeToString(hashInBytes)
 }
