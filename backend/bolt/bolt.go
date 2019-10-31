@@ -21,7 +21,6 @@ const (
 
 var (
 	ErrInvalidDBPath     = fmt.Errorf("db file doesn't exist")
-	ErrNotFoundResource  = fmt.Errorf("resource doesn't exist")
 	ErrDuplicateResource = fmt.Errorf("duplicate resource")
 )
 
@@ -251,7 +250,7 @@ func (tx *TableTX) Delete(key string) error {
 
 func (tx *TableTX) Update(key string, value []byte) error {
 	if v := tx.bucket.Get([]byte(key)); v == nil {
-		return ErrNotFoundResource
+		return kvzoo.ErrNotFound
 	}
 
 	return tx.bucket.Put([]byte(key), value)
@@ -263,7 +262,7 @@ func (tx *TableTX) Get(key string) ([]byte, error) {
 		copy(tmp, v)
 		return tmp, nil
 	} else {
-		return nil, ErrNotFoundResource
+		return nil, kvzoo.ErrNotFound
 	}
 }
 

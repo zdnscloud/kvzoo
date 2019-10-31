@@ -1,5 +1,11 @@
 package kvzoo
 
+import (
+	"errors"
+)
+
+var ErrNotFound = errors.New("key doesn't exist")
+
 type DB interface {
 	//footprint of the data
 	//normally it will iterate all the key and values
@@ -29,7 +35,7 @@ type Transaction interface {
 	//delete non-exist key returns nil
 	Delete(string) error
 	Update(string, []byte) error
-	//get non-exist key return err
+	//get non-exist key return ErrNotFound
 	Get(string) ([]byte, error)
 	List() (map[string][]byte, error)
 }

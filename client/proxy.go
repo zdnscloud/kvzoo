@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/zdnscloud/cement/log"
@@ -315,7 +316,11 @@ func (tx *ProxyTransaction) Get(key string) ([]byte, error) {
 		Key:  key,
 	}
 	if reply, err := tx.proxy.master.Get(context.TODO(), req); err != nil {
-		return nil, err
+		if strings.Contains(err.Error(), kvzoo.ErrNotFound.Error()) {
+			return nil, kvzoo.ErrNotFound
+		} else {
+			return nil, err
+		}
 	} else {
 		return reply.Value, nil
 	}

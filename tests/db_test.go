@@ -193,6 +193,7 @@ func testDelete(t *testing.T, db kvzoo.DB) {
 	ut.Equal(t, err, nil)
 	ut.Equal(t, len(data), 500)
 	db.DeleteTable(tableName)
+	ut.Assert(t, tableDoesNotHasKeys(db, tableName, keys), "")
 
 	keys, values = genData("key", "value", 100)
 	err = loadDataToTable(db, tableName, keys, values)

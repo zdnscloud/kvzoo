@@ -127,6 +127,29 @@ func tableHasData(db kvzoo.DB, tableName kvzoo.TableName, keys, values []string)
 	return true
 }
 
+func tableDoesNotHasKeys(db kvzoo.DB, tableName kvzoo.TableName, keys []string) bool {
+	table, err := db.CreateOrGetTable(tableName)
+	if err != nil {
+		return false
+	}
+
+	tx, err := table.Begin()
+	if err != nil {
+		return false
+	}
+	defer tx.Rollback()
+
+	for i := 0; i < len(keys); i++ {
+		_, err := tx.Get(keys[i])
+		if err != kvzoo.ErrNotFound {
+			return false
+		}
+
+	}
+
+	return true
+}
+
 func updateDataInTable(db kvzoo.DB, tableName kvzoo.TableName, keys, values []string) error {
 	return applyToTable(db, tableName, func(tx kvzoo.Transaction) dbOp {
 		return tx.Update
