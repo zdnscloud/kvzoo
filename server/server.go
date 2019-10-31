@@ -4,6 +4,7 @@ import (
 	"net"
 
 	"github.com/zdnscloud/kvzoo"
+	"github.com/zdnscloud/kvzoo/backend/bolt"
 	pb "github.com/zdnscloud/kvzoo/proto"
 	"google.golang.org/grpc"
 )
@@ -12,6 +13,20 @@ type KVGRPCServer struct {
 	service  *KVService
 	server   *grpc.Server
 	listener net.Listener
+}
+
+func NewWithBoltDB(addr string, dbFilePath string) (*KVGRPCServer, error) {
+	db, err := bolt.New(dbFilePath)
+	if err != nil {
+		return nil, err
+	}
+
+	if s, err := New(addr, db); err == nil {
+		return s, err
+	} else {
+		db.Destroy()
+		return nil, err
+	}
 }
 
 func New(addr string, db kvzoo.DB) (*KVGRPCServer, error) {
